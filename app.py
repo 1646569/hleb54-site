@@ -1,46 +1,38 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request
 import smtplib
 import os
 
-from email.mime.text import MIMEText
-
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev")
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 
-@app.route("/", methods=["GET", "POST"])
+TO_EMAIL = os.environ.get('TO_EMAIL')
+SMTP_SERVER = os.environ.get('SMTP_SERVER')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+
+@app.route('/')
 def index():
-    if request.method == "POST":
-        name = request.form.get("name")
-        phone = request.form.get("phone")
-        comment = request.form.get("comment")
+    return render_template('index.html')
 
-        # Отправка письма
-        smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.environ.get("SMTP_PORT", 587))
-        smtp_username = os.environ.get("SMTP_USERNAME")
-        smtp_password = os.environ.get("SMTP_PASSWORD")
-        to_email = os.environ.get("TO_EMAIL", "1790144@gmail.com")
-
-        subject = f"Новая заявка с сайта ХЛЕБ54 от {name}"
-        body = f"Имя: {name}\nТелефон: {phone}\nКомментарий: {comment}"
-
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = subject
-        msg["From"] = smtp_username
-        msg["To"] = to_email
-
+@app.route('/contacts', methods=['GET', 'POST'])
+def feedback():
+    message = ''
+    if request.method == 'POST':
+        name = request.form.get('name')
+        phone = request.form.get('phone')
         try:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
                 server.starttls()
-                server.login(smtp_username, smtp_password)
-                server.send_message(msg)
-            flash("Заявка успешно отправлена!", "success")
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                subject = f'Обратная связь с сайта: {name}'
+                body = f'Имя: {name}\nТелефон: {phone}'
+                msg = f'Subject: {subject}\n\n{body}'
+                server.sendmail(SMTP_USERNAME, TO_EMAIL, msg)
+            message = 'Спасибо! Мы свяжемся с вами.'
         except Exception as e:
-            flash(f"Ошибка при отправке: {e}", "error")
+            message = f'Ошибка отправки: {e}'
+    return render_template('contacts.html', message=message)
 
-        return redirect(url_for("index"))
-
-    return render_template("index.html")
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
